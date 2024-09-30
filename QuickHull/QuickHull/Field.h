@@ -4,7 +4,7 @@
 #include <string>
 
 #define FIELD_SIZE 1000000
-#define NUMBER_OF_POINTS 1000000
+#define NUMBER_OF_POINTS 10000
 
 struct Point
 {
