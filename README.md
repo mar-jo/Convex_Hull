@@ -5,4 +5,6 @@ Project Instructions & Need to Knows:
 - For randomly generated data, you can change the size of points within "Field.h" with "NUMBER_OF_POINTS".
 - The code may take a while to either read OR generate data, it works fine on my machine with 32GB RAM. There have been instances where 16GB may not be enough or take excessively long, please keep that in mind.
 - For the Generation of 100Mio. Datapoints, you may have to wait up to 4 Minutes.
+- The Project comes with two Testfiles ("testcase.txt", "random_points.txt").
+- Make sure that when you do want to read in a file, that it is exactly located where the other .txt Files are at. Otherwise the File Read may not work.
 - Have fun!
