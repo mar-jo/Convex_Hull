@@ -4,7 +4,7 @@
 #include <string>
 
 #define FIELD_SIZE 1000000
-#define NUMBER_OF_POINTS 10000
+#define NUMBER_OF_POINTS 100000
 
 struct Point
 {
@@ -23,6 +23,12 @@ struct PointHash
     {
         return std::hash<float>()(p.x) ^ (std::hash<float>()(p.y) << 1);
     }
+};
+
+struct Action
+{
+    enum ActionType { POINT, EDGE } type;
+    Point p1, p2; // if point, p2 will be ignored
 };
 
 class Field

@@ -1,11 +1,12 @@
-// Visualizer.cpp
 #include "Visualizer.h"
+
 #include <iostream>
+#include <algorithm>
 
-const float MARGIN_PERCENTAGE = 0.1f; // 10% margin for padding around the convex hull
+const float MARGIN_PERCENTAGE = 0.1f; // 10% padding around convex hull
 
-// Initialize SDL
-bool initSDL(SDL_Window** window, SDL_Renderer** renderer, int screenWidth, int screenHeight)
+// init SDL
+bool Visualizer::initSDL(SDL_Window** window, SDL_Renderer** renderer, int screenWidth, int screenHeight)
 {
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
     {
@@ -30,14 +31,15 @@ bool initSDL(SDL_Window** window, SDL_Renderer** renderer, int screenWidth, int 
     return true;
 }
 
-// Calculate the scaling factors and adjust for padding
-// Calculate the scaling factors and adjust for padding
-void calculateScalingFactors(const std::vector<Point>& points, int screenWidth, int screenHeight, int& scaleX, int& scaleY, int& offsetX, int& offsetY)
+// calculate scaling factors and adjust for padding
+void Visualizer::calculateScalingFactors(const std::vector<Point>& points, int screenWidth, int screenHeight, float& scaleX, float& scaleY, float& offsetX, float& offsetY)
 {
-    int64_t minX = FIELD_SIZE, maxX = 0;
-    int64_t minY = FIELD_SIZE, maxY = 0;
+    if (points.empty()) return;
 
-    // Find min and max x and y coordinates
+    float minX = points[0].x, maxX = points[0].x;
+    float minY = points[0].y, maxY = points[0].y;
+
+    // find min and max x and y coordinates
     for (const Point& p : points)
     {
         if (p.x < minX) minX = p.x;
@@ -46,111 +48,110 @@ void calculateScalingFactors(const std::vector<Point>& points, int screenWidth, 
         if (p.y > maxY) maxY = p.y;
     }
 
-    // Calculate the dimensions of the point field
-    int64_t fieldWidth = maxX - minX;
-    int64_t fieldHeight = maxY - minY;
+    // calculate width and height of point field
+    float fieldWidth = maxX - minX;
+    float fieldHeight = maxY - minY;
 
-    // Add padding (10%) to both dimensions
-    fieldWidth = (fieldWidth == 0) ? 1 : fieldWidth * (1 + MARGIN_PERCENTAGE); // Prevent zero width
-    fieldHeight = (fieldHeight == 0) ? 1 : fieldHeight * (1 + MARGIN_PERCENTAGE); // Prevent zero height
+    // non-zero dimensions to avoid division by zero
+    if (fieldWidth == 0) fieldWidth = 1;
+    if (fieldHeight == 0) fieldHeight = 1;
 
-    // Calculate the scaling factors
-    scaleX = fieldWidth / screenWidth;
-    scaleY = fieldHeight / screenHeight;
+    // add padding to field size
+    fieldWidth *= (1 + MARGIN_PERCENTAGE);
+    fieldHeight *= (1 + MARGIN_PERCENTAGE);
 
-    // Prevent zero scaling
-    if (scaleX == 0) scaleX = 1;
-    if (scaleY == 0) scaleY = 1;
+    // calculate scaling factors to fit the window
+    scaleX = screenWidth / fieldWidth;
+    scaleY = screenHeight / fieldHeight;
 
-    // Center the points by calculating offset (padding in both x and y)
-    offsetX = (screenWidth - (maxX - minX) / scaleX) / 2;
-    offsetY = (screenHeight - (maxY - minY) / scaleY) / 2;
+    // smaller scale to maintain aspect ratio
+    float scale = std::min(scaleX, scaleY);
+
+    // calculate offsets to center points within screen
+    offsetX = -minX * scale + (screenWidth - fieldWidth * scale) / 2;
+    offsetY = -minY * scale + (screenHeight - fieldHeight * scale) / 2;
 }
 
 
-// Draw points on the screen
-void drawPoints(SDL_Renderer* renderer, const std::vector<Point>& points, int scaleX, int scaleY, int offsetX, int offsetY)
+// draw points
+void Visualizer::drawPoints(SDL_Renderer* renderer, const std::vector<Point>& points, float scaleX, float scaleY, float offsetX, float offsetY)
 {
     for (const Point& p : points)
     {
-        SDL_RenderDrawPoint(renderer, p.x / scaleX + offsetX, p.y / scaleY + offsetY);
+        int screenX = static_cast<int>(p.x * scaleX + offsetX);
+        int screenY = static_cast<int>(p.y * scaleY + offsetY);
+        SDL_RenderDrawPoint(renderer, screenX, screenY);
     }
 }
 
-// Draw an edge between two points
-void drawEdge(SDL_Renderer* renderer, const Point& p1, const Point& p2, int scaleX, int scaleY, int offsetX, int offsetY)
+void Visualizer::drawPoint(SDL_Renderer* renderer, const Point& point, int scaleX, int scaleY, int offsetX, int offsetY)
 {
-    SDL_RenderDrawLine(renderer, p1.x / scaleX + offsetX, p1.y / scaleY + offsetY, p2.x / scaleX + offsetX, p2.y / scaleY + offsetY);
+    int screenX = point.x / scaleX + offsetX;
+    int screenY = point.y / scaleY + offsetY;
+    SDL_RenderDrawPoint(renderer, screenX, screenY);
 }
 
-// Generic visualization function to visualize any convex hull
-void visualizeConvexHull(const std::vector<Point>& field, const std::vector<Point>& hull, const std::string& algorithmName)
+// draw edge between two points
+void Visualizer::drawEdge(SDL_Renderer* renderer, const Point& p1, const Point& p2, float scaleX, float scaleY, float offsetX, float offsetY)
 {
-    int screenWidth = 800;
-    int screenHeight = 600;
+    int x1 = static_cast<int>(p1.x * scaleX + offsetX);
+    int y1 = static_cast<int>(p1.y * scaleY + offsetY);
+    int x2 = static_cast<int>(p2.x * scaleX + offsetX);
+    int y2 = static_cast<int>(p2.y * scaleY + offsetY);
 
+    SDL_RenderDrawLine(renderer, x1, y1, x2, y2);
+}
+
+void Visualizer::visualizeSteps(const std::vector<Point>& field, const std::vector<Action>& steps)
+{
+    // init SDL
     SDL_Window* window = nullptr;
     SDL_Renderer* renderer = nullptr;
+    int screenWidth = 800, screenHeight = 600;
 
-    // Initialize SDL
     if (!initSDL(&window, &renderer, screenWidth, screenHeight))
     {
+        std::cerr << "Failed to initialize SDL" << std::endl;
         return;
     }
 
-    // Scaling factors and offsets for padding
-    int scaleX = 1, scaleY = 1, offsetX = 0, offsetY = 0;
+    // calculate scaling and offsets
+    float scaleX = 1, scaleY = 1, offsetX = 0, offsetY = 0;
     calculateScalingFactors(field, screenWidth, screenHeight, scaleX, scaleY, offsetX, offsetY);
 
-    bool quit = false;
-    SDL_Event e;
-
-    // Clear the window to white
+    // draw field points
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderClear(renderer);
-
-    // Draw all points in black
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     drawPoints(renderer, field, scaleX, scaleY, offsetX, offsetY);
+    SDL_RenderPresent(renderer);
 
-    // Title display for which algorithm is being visualized
-    std::cout << "Visualizing " << algorithmName << " convex hull...\n";
+    // wait one second after opening screen
+    SDL_Delay(1000);
 
-    // Visualize step by step
-    for (size_t i = 0; i < hull.size(); ++i)
+    // visualize steps
+    for (const auto& step : steps)
     {
-        // Draw the edge between the current point and the next in the hull
-        if (i < hull.size() - 1)
+        if (step.type == Action::POINT)
         {
-            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color for the convex hull edges
-            drawEdge(renderer, hull[i], hull[i + 1], scaleX, scaleY, offsetX, offsetY);
+            // visualize point
+            SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // green
+            drawPoint(renderer, step.p1, scaleX, scaleY, offsetX, offsetY);
         }
-        else
+        else if (step.type == Action::EDGE)
         {
-            // Connect the last point to the first to close the hull
-            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-            drawEdge(renderer, hull[i], hull[0], scaleX, scaleY, offsetX, offsetY);
+            // visualize edge
+            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // red
+            drawEdge(renderer, step.p1, step.p2, scaleX, scaleY, offsetX, offsetY);
         }
 
-        // Update the window to show the drawing
         SDL_RenderPresent(renderer);
-
-        // Wait for a short period (e.g., 500 ms) to visualize step by step
-        SDL_Delay(500); // Pause for visualization
-
-        // Check for quit event
-        while (SDL_PollEvent(&e) != 0)
-        {
-            if (e.type == SDL_QUIT)
-            {
-                quit = true;
-                break;
-            }
-        }
-        if (quit) break;
+        SDL_Delay(500); // step delay
     }
 
-    // Keep the window open until the user closes it
+    // keep window open, until "X" is pressed
+    bool quit = false;
+    SDL_Event e;
     while (!quit)
     {
         while (SDL_PollEvent(&e) != 0)
@@ -162,7 +163,7 @@ void visualizeConvexHull(const std::vector<Point>& field, const std::vector<Poin
         }
     }
 
-    // Cleanup
+    // cleanup SDL
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();

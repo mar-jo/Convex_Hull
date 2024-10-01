@@ -1,4 +1,5 @@
 #define SDL_MAIN_HANDLED
+
 #include <iostream>
 #include <chrono>
 #include <string>
@@ -7,47 +8,6 @@
 #include "JervisMarch.h"
 #include "Field.h"
 #include "Visualizer.h"
-#include <SDL.h>
-
-#include <algorithm>
-#include <cmath>
-
-#include <algorithm>
-#include <cmath>
-
-// Function to compute the centroid of the convex hull
-Point computeCentroid(const std::vector<Point>& hull)
-{
-    float centroidX = 0, centroidY = 0;
-    for (const auto& point : hull)
-    {
-        centroidX += point.x;
-        centroidY += point.y;
-    }
-    centroidX /= hull.size();
-    centroidY /= hull.size();
-    return { centroidX, centroidY };
-}
-
-// Helper function to calculate the angle from the centroid
-float calculateAngleFromCentroid(const Point& centroid, const Point& p)
-{
-    return std::atan2(p.y - centroid.y, p.x - centroid.x);
-}
-
-// Sort hull points based on the angle from the centroid
-void sortHullPoints(std::vector<Point>& hull)
-{
-    // Compute the centroid of the hull
-    Point centroid = computeCentroid(hull);
-
-    // Sort the points based on their angle relative to the centroid
-    std::sort(hull.begin(), hull.end(), [&centroid](const Point& a, const Point& b)
-        {
-            return calculateAngleFromCentroid(centroid, a) < calculateAngleFromCentroid(centroid, b);
-        });
-}
-
 
 int main() 
 {
@@ -73,70 +33,80 @@ int main()
         std::cin >> filename;
 
         field = generator.readFromFile(filename);
+
+        if (field.empty())
+        {
+            std::cerr << "No valid points found in file..." << std::endl;
+            return -1;
+        }
     }
     else
     {
         std::cout << "Error: Invalid Input. Terminating Program.\n";
     }
 
-    //TODO DRAW with abfrage
-
     char visualize;
-    std::cout << "Would you like to visualize the convex hull? (y/n): ";
+    std::cout << "Would you like to visualize the Convex Hull? (y/n): ";
     std::cin >> visualize;
-    bool draw = visualize == 'y' ? true : false;
+    bool draw = (visualize == 'y' ? true : false);
 
     //QUICKHULL
     QuickHull quickHull(field);
+    std::vector<Action> visualizationStepsQuickHull; // Logging
 
     // START TIME
     auto start = std::chrono::high_resolution_clock::now();
 
-    std::vector<Point> convexHullQuickHull = quickHull.quickHullAlgorithm();
+    std::vector<Point> convexHullQuickHull = quickHull.quickHullAlgorithm(visualizationStepsQuickHull);
 
     // END TIME
     auto end = std::chrono::high_resolution_clock::now();
 
     std::chrono::duration<double, std::milli> duration = end - start;
-    std::cout << "TIME TAKEN QUICKHULL: " << duration.count() << " ms\n\n";
-
-    // Sort the points in the convex hull based on their angle from the centroid
-    sortHullPoints(convexHullQuickHull);
-
-    std::cout << "CONVEX HULL POINTS: " << std::endl;
-    for (const auto& point : convexHullQuickHull)
-    {
-        std::cout << "[" << point.x << ", " << point.y << "]" << std::endl;
-    }
 
     if (draw)
     {
-        visualizeConvexHull(field, convexHullQuickHull, "QuickHull");
-	}   
+        Visualizer vis;
+        vis.visualizeSteps(field, visualizationStepsQuickHull);
+    }
+    else
+    {
+        std::cout << "TIME TAKEN QUICKHULL: " << duration.count() << " ms\n\n";
+
+        std::cout << "CONVEX HULL POINTS: " << std::endl;
+        for (const auto& point : convexHullQuickHull)
+        {
+            std::cout << "[" << point.x << ", " << point.y << "]" << std::endl;
+        }
+    }
 
     //JERVIS MARCH
     JervisMarch jervisMarch(field);
+    std::vector<Action> visualizationStepsJervisMarch; // Logging
 
     // START TIME
     start = std::chrono::high_resolution_clock::now();
 
-    std::vector<Point> convexHullJervisMarch = jervisMarch.jervisMarchAlgorithm();
+    std::vector<Point> convexHullJervisMarch = jervisMarch.jervisMarchAlgorithm(visualizationStepsJervisMarch);
 
     // END TIME
     end = std::chrono::high_resolution_clock::now();
 
-    duration = end - start;
-    std::cout << "\n\nTIME TAKEN JERVIS MARCH: " << duration.count() << " ms\n\n";
-
-    std::cout << "CONVEX HULL POINTS: " << std::endl;
-    for (const auto& point : convexHullJervisMarch)
-    {
-        std::cout << "[" << point.x << ", " << point.y << "]" << std::endl;
-    }
-
     if (draw)
     {
-        visualizeConvexHull(field, convexHullJervisMarch, "JervisMarch");
+        Visualizer vis;
+        vis.visualizeSteps(field, visualizationStepsJervisMarch);
+    }
+    else
+    {
+        duration = end - start;
+        std::cout << "\n\nTIME TAKEN JERVIS MARCH: " << duration.count() << " ms\n\n";
+
+        std::cout << "CONVEX HULL POINTS: " << std::endl;
+        for (const auto& point : convexHullJervisMarch)
+        {
+            std::cout << "[" << point.x << ", " << point.y << "]" << std::endl;
+        }
     }
 
     return 0;

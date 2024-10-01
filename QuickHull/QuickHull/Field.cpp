@@ -43,6 +43,10 @@ std::vector<Point> Field::readFromFile(const std::string& filename)
     }
 
     std::string line;
+
+    // Skip first line
+    std::getline(file, line);
+
     while (std::getline(file, line)) 
     {
         std::stringstream ss(line);

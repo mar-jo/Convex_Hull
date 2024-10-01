@@ -19,7 +19,7 @@ float JervisMarch::crossProduct(const Point& A, const Point& B, const Point& C)
     return (B.x - A.x) * (C.y - A.y) - (B.y - A.y) * (C.x - A.x);
 }
 
-std::vector<Point> JervisMarch::jervisMarchAlgorithm()
+std::vector<Point> JervisMarch::jervisMarchAlgorithm(std::vector<Action>& visualizationSteps)
 {
     if (this->field.size() < 3)
     {
@@ -35,6 +35,9 @@ std::vector<Point> JervisMarch::jervisMarchAlgorithm()
     {
         hull.push_back(current);
 
+        // log current point
+        visualizationSteps.push_back({ Action::POINT, current });
+
         Point next = this->field[0];
 
         std::for_each(std::execution::par, this->field.begin(), this->field.end(), [&](const Point& candidate) 
@@ -44,6 +47,9 @@ std::vector<Point> JervisMarch::jervisMarchAlgorithm()
                 next = candidate;
             }
         });
+
+        // log edge between current and next point
+        visualizationSteps.push_back({ Action::EDGE, current, next });
 
         current = next;
 
